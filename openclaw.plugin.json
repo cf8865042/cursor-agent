@@ -1,0 +1,57 @@
+{
+  "id": "cursor-agent",
+  "name": "Cursor Agent",
+  "description": "调用本机 Cursor Agent CLI 对项目进行深度代码分析、排查和诊断。支持加载项目的 .cursor/rules、AGENTS.md 和 MCP 服务器。",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "agentPath": {
+        "type": "string",
+        "description": "agent 命令的完整路径。留空则自动检测"
+      },
+      "defaultTimeoutSec": {
+        "type": "integer",
+        "minimum": 30,
+        "maximum": 1800,
+        "description": "默认超时（秒），默认 600"
+      },
+      "noOutputTimeoutSec": {
+        "type": "integer",
+        "minimum": 10,
+        "maximum": 600,
+        "description": "无输出超时（秒），连续无输出超过此时间判定挂死，默认 120"
+      },
+      "model": {
+        "type": "string",
+        "description": "指定 Cursor Agent 使用的模型，如 claude-4-sonnet。留空使用默认模型"
+      },
+      "enableMcp": {
+        "type": "boolean",
+        "description": "是否启用 MCP 服务器（--approve-mcps），默认 true"
+      },
+      "projects": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        },
+        "description": "项目名称到路径的映射表"
+      }
+    }
+  },
+  "uiHints": {
+    "agentPath": {
+      "label": "Agent CLI Path",
+      "help": "Cursor Agent CLI 的完整路径。留空自动检测 PATH 中的 agent 命令"
+    },
+    "defaultTimeoutSec": {
+      "label": "Default Timeout (sec)",
+      "help": "单次调用的最大执行时间"
+    },
+    "projects": {
+      "label": "Project Mapping",
+      "help": "项目名称到本地路径的映射"
+    }
+  }
+}
