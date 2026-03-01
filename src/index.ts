@@ -146,7 +146,7 @@ export default {
       name: "cursor",
       description: `Invoke Cursor Agent for code analysis and modification. ${projectListStr}`,
       acceptsArgs: true,
-      requireAuth: true,
+      requireAuth: false,
 
       async handler(ctx: any) {
         const parsed = parseCommandArgs(ctx.args ?? "");

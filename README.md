@@ -162,7 +162,46 @@ openclaw plugin install cursor-agent-0.1.0.tgz
 }
 ```
 
-### 5. Start Using
+### 5. Configure Command Authorization
+
+The `/cursor` command requires authorization by default (`requireAuth: true`). You need to configure `commands.allowFrom` in OpenClaw before using it. There are two ways:
+
+**Option A: Via Control UI (Recommended)**
+
+1. Open the OpenClaw Control UI in your browser: `http://127.0.0.1:<port>/config?token=<your-gateway-token>`
+2. Click **Commands** in the left navigation panel
+3. Find the **Command Elevated Access Rules** section
+4. Click **+ Add Entry** to add a rule:
+   - Set **Key** to a channel ID (use `*` for all channels)
+   - Click **+ Add** below to add allowed sender IDs (use `*` for all users)
+5. Click **Save** at the top, then **Apply** to activate the configuration
+
+![Command Elevated Access Rules UI](docs/config-commands-allowfrom.png)
+
+**Option B: Edit Config File Directly**
+
+Add the `allowFrom` field to the `commands` section in `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "commands": {
+    "allowFrom": {
+      "*": ["*"]
+    }
+  }
+}
+```
+
+**`allowFrom` Reference:**
+
+| Key (Channel ID) | Value (Sender List) | Effect |
+|-------------------|---------------------|--------|
+| `"*"` | `["*"]` | All users on all channels can execute authorized commands |
+| `"*"` | `["user1", "admin"]` | Only specified users on all channels |
+
+> **Production Tip**: In production, restrict `allowFrom` to specific channels and users instead of using the `"*"` wildcard to ensure only authorized personnel can execute code modification operations.
+
+### 6. Start Using
 
 ```
 /cursor my-project analyze the auth module and find potential security issues

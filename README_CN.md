@@ -162,7 +162,46 @@ openclaw plugin install cursor-agent-0.1.0.tgz
 }
 ```
 
-### 5. 开始使用
+### 5. 配置命令授权
+
+`/cursor` 命令默认需要授权（`requireAuth: true`），需要在 OpenClaw 中配置 `commands.allowFrom` 才能正常使用。有两种配置方式：
+
+**方式 A：通过 Control UI 配置（推荐）**
+
+1. 在浏览器中打开 OpenClaw Control UI：`http://127.0.0.1:<port>/config?token=<your-gateway-token>`
+2. 在左侧导航栏找到 **Commands** 分类并点击
+3. 在右侧找到 **Command Elevated Access Rules** 配置项
+4. 点击 **+ Add Entry** 添加一条规则：
+   - **Key** 填入渠道 ID（填 `*` 表示所有渠道）
+   - 在下方列表点击 **+ Add** 添加允许的发送者 ID（填 `*` 表示所有用户）
+5. 点击顶部的 **Save** 保存，然后点击 **Apply** 使配置生效
+
+![Command Elevated Access Rules 配置界面](docs/config-commands-allowfrom.png)
+
+**方式 B：直接编辑配置文件**
+
+在 `~/.openclaw/openclaw.json` 的 `commands` 部分添加 `allowFrom` 字段：
+
+```json
+{
+  "commands": {
+    "allowFrom": {
+      "*": ["*"]
+    }
+  }
+}
+```
+
+**`allowFrom` 配置说明：**
+
+| Key（渠道 ID） | Value（发送者列表） | 效果 |
+|----------------|---------------------|------|
+| `"*"` | `["*"]` | 所有渠道的所有用户都可执行需授权的命令 |
+| `"*"` | `["user1", "admin"]` | 所有渠道中只有指定用户可执行 |
+
+> **生产环境建议**：上线后将 `allowFrom` 限制为具体的渠道和用户，避免使用 `"*"` 通配符，以确保只有授权人员可以执行代码修改操作。
+
+### 6. 开始使用
 
 ```
 /cursor my-project 分析认证模块的实现，找出潜在的安全问题
