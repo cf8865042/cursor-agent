@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { EventEmitter } from "node:events";
 
+const isWindows = process.platform === "win32";
+
 /**
  * process-registry uses module-level state (Map, variables).
  * Each test needs isolation via vi.resetModules() + dynamic import.
@@ -97,7 +99,7 @@ describe("process-registry", () => {
       expect(() => reg.gracefulKill(proc)).not.toThrow();
     });
 
-    it("sends SIGTERM to process group on Unix", async () => {
+    it.skipIf(isWindows)("sends SIGTERM to process group on Unix", async () => {
       const reg = await loadFreshRegistry();
       const proc = createMockProc(9999);
       const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
@@ -109,7 +111,7 @@ describe("process-registry", () => {
       }
     });
 
-    it("falls back to proc.kill when process.kill fails", async () => {
+    it.skipIf(isWindows)("falls back to proc.kill when process.kill fails", async () => {
       const reg = await loadFreshRegistry();
       const proc = createMockProc(9999);
       const killSpy = vi.spyOn(process, "kill").mockImplementation(() => { throw new Error("no such process"); });
@@ -120,10 +122,25 @@ describe("process-registry", () => {
         killSpy.mockRestore();
       }
     });
+
+    it.skipIf(!isWindows)("uses taskkill without /F on Windows (graceful)", async () => {
+      const { spawn: realSpawn } = await import("node:child_process");
+      const spawnSpy = vi.fn(realSpawn);
+      vi.doMock("node:child_process", () => ({ spawn: spawnSpy }));
+      const reg = await loadFreshRegistry();
+      const proc = createMockProc(9999);
+      reg.gracefulKill(proc);
+      expect(spawnSpy).toHaveBeenCalledWith(
+        "taskkill",
+        ["/T", "/PID", "9999"],
+        expect.objectContaining({ stdio: "ignore" }),
+      );
+      vi.doUnmock("node:child_process");
+    });
   });
 
   describe("forceKill", () => {
-    it("sends SIGKILL to process group on Unix", async () => {
+    it.skipIf(isWindows)("sends SIGKILL to process group on Unix", async () => {
       const reg = await loadFreshRegistry();
       const proc = createMockProc(8888);
       const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
@@ -134,10 +151,25 @@ describe("process-registry", () => {
         killSpy.mockRestore();
       }
     });
+
+    it.skipIf(!isWindows)("uses taskkill with /F on Windows (force)", async () => {
+      const { spawn: realSpawn } = await import("node:child_process");
+      const spawnSpy = vi.fn(realSpawn);
+      vi.doMock("node:child_process", () => ({ spawn: spawnSpy }));
+      const reg = await loadFreshRegistry();
+      const proc = createMockProc(8888);
+      reg.forceKill(proc);
+      expect(spawnSpy).toHaveBeenCalledWith(
+        "taskkill",
+        ["/F", "/T", "/PID", "8888"],
+        expect.objectContaining({ stdio: "ignore" }),
+      );
+      vi.doUnmock("node:child_process");
+    });
   });
 
   describe("killWithGrace", () => {
-    it("sends SIGTERM first then SIGKILL after delay", async () => {
+    it.skipIf(isWindows)("sends SIGTERM first then SIGKILL after delay", async () => {
       vi.useFakeTimers();
       try {
         const reg = await loadFreshRegistry();
@@ -162,16 +194,17 @@ describe("process-registry", () => {
       try {
         const reg = await loadFreshRegistry();
         const proc = createMockProc(6666);
-        const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
+        const killSpy = isWindows ? undefined : vi.spyOn(process, "kill").mockImplementation(() => true);
 
         reg.killWithGrace(proc);
-        killSpy.mockClear();
+        killSpy?.mockClear();
 
         proc.exitCode = 0;
         vi.advanceTimersByTime(5000);
-        expect(killSpy).not.toHaveBeenCalled();
-
-        killSpy.mockRestore();
+        if (killSpy) {
+          expect(killSpy).not.toHaveBeenCalled();
+          killSpy.mockRestore();
+        }
       } finally {
         vi.useRealTimers();
       }

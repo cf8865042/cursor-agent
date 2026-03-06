@@ -13,54 +13,51 @@ import type {
   CollectedEvent,
 } from "./types.js";
 
-/** Build CLI command and arguments */
-function buildCommand(opts: RunOptions): { cmd: string; args: string[] } {
-  const agentArgs: string[] = [
+/** Build CLI command and arguments (跨平台统一) */
+function buildCommand(opts: RunOptions): { cmd: string; args: string[]; shell: boolean } {
+  const resolved = opts.resolvedBinary;
+
+  const cliArgs: string[] = [];
+
+  if (resolved) {
+    // 直接调用 node，entryScript 作为第一个参数
+    cliArgs.push(resolved.entryScript);
+  }
+
+  cliArgs.push(
+    ...(opts.prefixArgs ?? []),
     "-p", "--trust",
     "--output-format", "stream-json",
-  ];
+  );
 
-  // Session management args are mutually exclusive with --mode: skip mode when resuming
   if (opts.resumeSessionId) {
-    agentArgs.push("--resume", opts.resumeSessionId);
+    cliArgs.push("--resume", opts.resumeSessionId);
   } else if (opts.continueSession) {
-    agentArgs.push("--continue");
+    cliArgs.push("--continue");
   } else if (opts.mode !== "agent") {
-    // agent is the default mode, no need to pass --mode; CLI only accepts plan and ask
-    agentArgs.push("--mode", opts.mode);
+    cliArgs.push("--mode", opts.mode);
   }
 
   if (opts.enableMcp) {
-    agentArgs.push("--approve-mcps");
+    cliArgs.push("--approve-mcps");
   }
   if (opts.model) {
-    agentArgs.push("--model", opts.model);
+    cliArgs.push("--model", opts.model);
   }
 
-  agentArgs.push(opts.prompt);
+  cliArgs.push(opts.prompt);
 
-  if (process.platform === "win32") {
-    const escaped = opts.prompt.replace(/'/g, "''");
-    const parts = [
-      "agent", "-p", "--trust",
-      "--output-format", "stream-json",
-    ];
-    if (opts.resumeSessionId) {
-      parts.push("--resume", `'${opts.resumeSessionId}'`);
-    } else if (opts.continueSession) {
-      parts.push("--continue");
-    } else if (opts.mode !== "agent") {
-      parts.push("--mode", opts.mode);
-    }
-    if (opts.enableMcp) parts.push("--approve-mcps");
-    if (opts.model) parts.push("--model", `'${opts.model}'`);
-    parts.push(`'${escaped}'`);
-
-    const psCommand = `Set-Location '${opts.projectPath}'; ${parts.join(" ")}`;
-    return { cmd: "powershell.exe", args: ["-NoProfile", "-Command", psCommand] };
+  if (resolved) {
+    // 直接调用 node 可执行文件，不需要 shell
+    return { cmd: resolved.nodeBin, args: cliArgs, shell: false };
   }
 
-  return { cmd: opts.agentPath, args: agentArgs };
+  // 回退：直接调用 agentPath（兼容未来独立 agent.exe 等场景）
+  const needsShell =
+    process.platform === "win32" &&
+    /\.(cmd|bat)$/i.test(opts.agentPath);
+
+  return { cmd: opts.agentPath, args: cliArgs, shell: needsShell };
 }
 
 /** Execute Cursor Agent CLI and collect the full event stream */
@@ -78,13 +75,14 @@ export async function runCursorAgent(opts: RunOptions): Promise<RunResult> {
 
   const runId = opts.runId ?? randomUUID();
   const startTime = Date.now();
-  const { cmd, args } = buildCommand(opts);
+  const { cmd, args, shell } = buildCommand(opts);
 
   const isUnix = process.platform !== "win32";
   const proc = spawn(cmd, args, {
-    cwd: isUnix ? opts.projectPath : undefined,
+    cwd: opts.projectPath,
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
+    shell,
     detached: isUnix,
   });
   if (isUnix) proc.unref();

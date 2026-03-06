@@ -5,7 +5,8 @@ import { runCursorAgent } from "./runner.js";
 import { formatRunResult } from "./formatter.js";
 import { ensureShutdownHook, setMaxConcurrent } from "./process-registry.js";
 import { createCursorAgentTool } from "./tool.js";
-import type { CursorAgentConfig, ParsedCommand } from "./types.js";
+import { resolveAgentBinary } from "./resolve-binary.js";
+import type { CursorAgentConfig, ParsedCommand, ResolvedBinary } from "./types.js";
 
 const PLUGIN_ID = "cursor-agent";
 
@@ -23,10 +24,25 @@ function detectAgentPath(): string | null {
     if (first && existsSync(first)) return first;
   } catch { /* ignore */ }
 
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+  if (!home) return null;
+
   if (process.platform === "win32") {
-    const home = process.env.USERPROFILE || "";
-    const defaultPath = resolve(home, "AppData/Local/cursor-agent/agent.cmd");
-    if (existsSync(defaultPath)) return defaultPath;
+    const candidates = [
+      resolve(home, "AppData/Local/cursor-agent/agent.cmd"),
+      resolve(home, ".cursor/bin/agent.cmd"),
+    ];
+    for (const p of candidates) {
+      if (existsSync(p)) return p;
+    }
+  } else {
+    const candidates = [
+      resolve(home, ".cursor/bin/agent"),
+      resolve(home, ".local/bin/agent"),
+    ];
+    for (const p of candidates) {
+      if (existsSync(p)) return p;
+    }
   }
 
   return null;
@@ -125,11 +141,31 @@ export default {
 
   register(api: any) {
     const cfg: CursorAgentConfig = api.pluginConfig ?? {};
+    console.log(`[${PLUGIN_ID}] pluginConfig:`, JSON.stringify(cfg));
 
     const agentPath = cfg.agentPath || detectAgentPath();
     if (!agentPath) {
       console.warn(`[${PLUGIN_ID}] Cursor Agent CLI not found, plugin disabled`);
       return;
+    }
+
+    // 解析底层 node + index.js，优先使用配置，其次自动解析
+    let resolvedBinary: ResolvedBinary | undefined;
+    if (cfg.agentNodeBin && cfg.agentEntryScript) {
+      if (existsSync(cfg.agentNodeBin) && existsSync(cfg.agentEntryScript)) {
+        resolvedBinary = { nodeBin: cfg.agentNodeBin, entryScript: cfg.agentEntryScript };
+        console.log(`[${PLUGIN_ID}] using configured binary: ${cfg.agentNodeBin}`);
+      } else {
+        console.warn(`[${PLUGIN_ID}] configured agentNodeBin/agentEntryScript not found, falling back to auto-resolve`);
+      }
+    }
+    if (!resolvedBinary) {
+      resolvedBinary = resolveAgentBinary(agentPath) ?? undefined;
+      if (resolvedBinary) {
+        console.log(`[${PLUGIN_ID}] resolved binary: ${resolvedBinary.nodeBin} ${resolvedBinary.entryScript}`);
+      } else {
+        console.log(`[${PLUGIN_ID}] binary resolve failed, will invoke agentPath directly: ${agentPath}`);
+      }
     }
 
     if (cfg.maxConcurrent) setMaxConcurrent(cfg.maxConcurrent);
@@ -164,6 +200,7 @@ export default {
 
         const result = await runCursorAgent({
           agentPath,
+          resolvedBinary,
           projectPath,
           prompt: parsed.prompt,
           mode: parsed.mode,
@@ -171,6 +208,7 @@ export default {
           noOutputTimeoutSec: cfg.noOutputTimeoutSec ?? DEFAULT_NO_OUTPUT_TIMEOUT_SEC,
           enableMcp: cfg.enableMcp ?? DEFAULT_ENABLE_MCP,
           model: cfg.model,
+          prefixArgs: cfg.prefixArgs,
           continueSession: parsed.continueSession,
           resumeSessionId: parsed.resumeSessionId,
         });
@@ -184,7 +222,7 @@ export default {
     // ── Path 2: Agent Tool (PI Agent fallback invocation) ──
     if (cfg.enableAgentTool !== false && projectNames.length > 0) {
       api.registerTool(
-        createCursorAgentTool({ agentPath, projects, cfg }),
+        createCursorAgentTool({ agentPath, resolvedBinary, projects, cfg }),
         { name: "cursor_agent", optional: true },
       );
       console.log(`[${PLUGIN_ID}] registered cursor_agent tool`);

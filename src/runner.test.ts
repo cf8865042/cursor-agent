@@ -287,6 +287,18 @@ describe("runCursorAgent", () => {
     expect(args).toContain("chat-abc");
   });
 
+  it("sets cwd on all platforms", async () => {
+    const proc = createMockChildProcess();
+    spawnMock.mockReturnValue(proc);
+
+    const promise = runCursorAgent(makeOpts());
+    proc.simulateClose(0);
+    await promise;
+
+    const spawnOpts = spawnMock.mock.calls[0]![2] as Record<string, unknown>;
+    expect(spawnOpts.cwd).toBe("/tmp/test-project");
+  });
+
   it("enables detached mode on Unix", async () => {
     const proc = createMockChildProcess();
     spawnMock.mockReturnValue(proc);

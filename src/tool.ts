@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { runCursorAgent } from "./runner.js";
 import { formatRunResult, extractModifiedFiles } from "./formatter.js";
-import type { CursorAgentConfig } from "./types.js";
+import type { CursorAgentConfig, ResolvedBinary } from "./types.js";
 
 function resolveProjectPath(
   projectKey: string,
@@ -55,6 +55,7 @@ interface ToolResult {
 
 export function createCursorAgentTool(params: {
   agentPath: string;
+  resolvedBinary?: ResolvedBinary;
   projects: Record<string, string>;
   cfg: CursorAgentConfig;
   sendMessage?: SendMessageFn;
@@ -117,6 +118,7 @@ export function createCursorAgentTool(params: {
 
       const result = await runCursorAgent({
         agentPath: params.agentPath,
+        resolvedBinary: params.resolvedBinary,
         projectPath,
         prompt,
         mode,
@@ -124,6 +126,7 @@ export function createCursorAgentTool(params: {
         noOutputTimeoutSec: params.cfg.noOutputTimeoutSec ?? 120,
         enableMcp: params.cfg.enableMcp ?? true,
         model: params.cfg.model,
+        prefixArgs: params.cfg.prefixArgs,
         signal,
       });
 

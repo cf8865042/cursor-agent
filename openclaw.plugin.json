@@ -9,7 +9,15 @@
     "properties": {
       "agentPath": {
         "type": "string",
-        "description": "Full path to the agent command. Leave empty for auto-detection"
+        "description": "Full path to the agent command (agent.cmd / agent). Leave empty for auto-detection. The plugin will auto-resolve the underlying node + index.js binary"
+      },
+      "agentNodeBin": {
+        "type": "string",
+        "description": "Direct path to the Node.js executable bundled with Cursor Agent (e.g. .../versions/2026.x.x-xxx/node.exe). When set with agentEntryScript, bypasses .cmd/shell script resolution"
+      },
+      "agentEntryScript": {
+        "type": "string",
+        "description": "Direct path to the Agent entry script (e.g. .../versions/2026.x.x-xxx/index.js). Must be used together with agentNodeBin"
       },
       "defaultTimeoutSec": {
         "type": "integer",
@@ -53,7 +61,15 @@
   "uiHints": {
     "agentPath": {
       "label": "Agent CLI Path",
-      "help": "Full path to Cursor Agent CLI. Leave empty to auto-detect from PATH"
+      "help": "Full path to Cursor Agent CLI (agent.cmd / agent). Leave empty to auto-detect. The plugin auto-resolves the underlying node binary"
+    },
+    "agentNodeBin": {
+      "label": "Node Binary Path",
+      "help": "Direct path to Node.js executable bundled with Cursor Agent. Use with Entry Script for manual override"
+    },
+    "agentEntryScript": {
+      "label": "Entry Script Path",
+      "help": "Direct path to Agent index.js entry script. Use with Node Binary Path for manual override"
     },
     "defaultTimeoutSec": {
       "label": "Default Timeout (sec)",

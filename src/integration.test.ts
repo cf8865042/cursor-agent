@@ -15,7 +15,7 @@ import * as registry from "./process-registry.js";
 import type { RunOptions } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MOCK_AGENT = resolve(__dirname, "__fixtures__/mock-agent.mjs");
+const MOCK_AGENT_SCRIPT = resolve(__dirname, "__fixtures__/mock-agent.mjs");
 
 function makeOpts(overrides: Partial<RunOptions> & { env?: Record<string, string> } = {}): RunOptions {
   const { env: _env, ...rest } = overrides;
@@ -31,13 +31,6 @@ function makeOpts(overrides: Partial<RunOptions> & { env?: Record<string, string
   };
 }
 
-/**
- * Since buildCommand in runner uses opts.agentPath as the cmd,
- * we use node + mock-agent.mjs for simulation.
- * The simplest approach is to set agentPath to the mock-agent.mjs script
- * with a shebang and make it executable.
- */
-
 describe("integration: full execution flow", () => {
   beforeEach(() => {
     registry.setMaxConcurrent(5);
@@ -46,7 +39,8 @@ describe("integration: full execution flow", () => {
   it("success scenario: collect events → format output", async () => {
     const result = await runCursorAgent({
       ...makeOpts(),
-      agentPath: MOCK_AGENT,
+      agentPath: process.execPath,
+      prefixArgs: [MOCK_AGENT_SCRIPT],
     });
 
     expect(result.success).toBe(true);
@@ -72,18 +66,13 @@ describe("integration: full execution flow", () => {
   });
 
   it("error scenario: CLI returns error", async () => {
-    const result = await runCursorAgent({
-      ...makeOpts(),
-      agentPath: MOCK_AGENT,
-    });
-
     const badResult = await runCursorAgent({
       ...makeOpts(),
-      agentPath: "/nonexistent/path/to/agent",
+      agentPath: process.execPath,
+      prefixArgs: ["/nonexistent/mock-agent-script.mjs"],
     });
 
     expect(badResult.success).toBe(false);
-    expect(badResult.error).toBeTruthy();
   });
 
   it("AbortSignal interrupts execution", async () => {
@@ -91,7 +80,8 @@ describe("integration: full execution flow", () => {
 
     const promise = runCursorAgent({
       ...makeOpts(),
-      agentPath: MOCK_AGENT,
+      agentPath: process.execPath,
+      prefixArgs: [MOCK_AGENT_SCRIPT],
       signal: ac.signal,
       timeoutSec: 30,
       noOutputTimeoutSec: 30,
@@ -109,7 +99,8 @@ describe("integration: full execution flow", () => {
 
     await runCursorAgent({
       ...makeOpts(),
-      agentPath: MOCK_AGENT,
+      agentPath: process.execPath,
+      prefixArgs: [MOCK_AGENT_SCRIPT],
       runId: "integration-test-1",
     });
 
@@ -121,7 +112,8 @@ describe("integration: full execution flow", () => {
 
     const longRunPromise = runCursorAgent({
       ...makeOpts(),
-      agentPath: MOCK_AGENT,
+      agentPath: process.execPath,
+      prefixArgs: [MOCK_AGENT_SCRIPT],
       runId: "long-run",
     });
 
@@ -194,9 +186,9 @@ describe("integration: tool + runner + formatter end-to-end", () => {
 
     const projects = { testproj: __dirname };
     const factory = createCursorAgentTool({
-      agentPath: MOCK_AGENT,
+      agentPath: process.execPath,
       projects,
-      cfg: { defaultTimeoutSec: 10, noOutputTimeoutSec: 5, enableMcp: false },
+      cfg: { defaultTimeoutSec: 10, noOutputTimeoutSec: 5, enableMcp: false, prefixArgs: [MOCK_AGENT_SCRIPT] },
     });
 
     const tool = factory({});

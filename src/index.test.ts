@@ -199,7 +199,7 @@ describe("plugin.register", () => {
     expect(api.registerCommand).toHaveBeenCalledWith(expect.objectContaining({
       name: "cursor",
       acceptsArgs: true,
-      requireAuth: true,
+      requireAuth: false,
     }));
   });
 

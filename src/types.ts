@@ -1,6 +1,18 @@
+/** 解析后的 Cursor Agent 可执行信息 */
+export interface ResolvedBinary {
+  /** Node.js 可执行文件路径（如 .../versions/xxx/node.exe） */
+  nodeBin: string;
+  /** Agent 入口脚本路径（如 .../versions/xxx/index.js） */
+  entryScript: string;
+}
+
 /** Plugin configuration */
 export interface CursorAgentConfig {
   agentPath?: string;
+  /** Node.js 可执行文件路径，配合 agentEntryScript 使用可跳过 .cmd/shell 脚本解析 */
+  agentNodeBin?: string;
+  /** Agent 入口 JS 脚本路径，配合 agentNodeBin 使用 */
+  agentEntryScript?: string;
   defaultTimeoutSec?: number;
   noOutputTimeoutSec?: number;
   model?: string;
@@ -10,6 +22,8 @@ export interface CursorAgentConfig {
   maxConcurrent?: number;
   /** Whether to register Agent Tool for PI Agent auto-invocation, default true */
   enableAgentTool?: boolean;
+  /** 插入到 agentPath 之后、标准参数之前的额外参数（用于测试等场景） */
+  prefixArgs?: string[];
 }
 
 /** Base type for stream-json events */
@@ -98,6 +112,8 @@ export interface CollectedEvent {
 /** Runner execution options */
 export interface RunOptions {
   agentPath: string;
+  /** 解析后的底层二进制信息，优先于 agentPath 使用 */
+  resolvedBinary?: ResolvedBinary;
   projectPath: string;
   prompt: string;
   mode: "agent" | "ask" | "plan";
@@ -112,6 +128,8 @@ export interface RunOptions {
   resumeSessionId?: string;
   /** Run identifier for the process registry */
   runId?: string;
+  /** 插入到 agentPath 之后、标准参数之前的额外参数（用于测试等场景） */
+  prefixArgs?: string[];
 }
 
 /** Runner execution result */

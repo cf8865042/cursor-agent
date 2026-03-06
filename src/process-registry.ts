@@ -33,12 +33,13 @@ export function isFull(): boolean {
   return activeProcesses.size >= maxConcurrent;
 }
 
-/** Send SIGTERM to process group (Unix) or taskkill (Windows) */
+/** Send SIGTERM to process group (Unix) or non-forced taskkill (Windows) */
 export function gracefulKill(proc: ChildProcess): void {
   if (!proc.pid) return;
   try {
     if (process.platform === "win32") {
-      spawn("taskkill", ["/F", "/T", "/PID", String(proc.pid)], { stdio: "ignore" });
+      // 不带 /F，向进程树发送 WM_CLOSE 消息，允许进程自行清理退出
+      spawn("taskkill", ["/T", "/PID", String(proc.pid)], { stdio: "ignore" });
     } else {
       process.kill(-proc.pid, "SIGTERM");
     }
@@ -47,7 +48,7 @@ export function gracefulKill(proc: ChildProcess): void {
   }
 }
 
-/** Send SIGKILL to force terminate */
+/** Send SIGKILL (Unix) or forced taskkill (Windows) to terminate immediately */
 export function forceKill(proc: ChildProcess): void {
   if (!proc.pid) return;
   try {
