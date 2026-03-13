@@ -134,7 +134,7 @@ export CURSOR_API_KEY="your-api-key"
 
 ```bash
 npm ci && npm run build && npm pack
-openclaw plugin install cursor-agent-0.1.0.tgz
+openclaw plugins install cursor-agent-0.1.0.tgz
 ```
 
 ### 4. 配置
