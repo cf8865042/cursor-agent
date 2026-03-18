@@ -63,6 +63,9 @@ export function createCursorAgentTool(params: {
   const projectNames = Object.keys(params.projects);
   const projectListStr = projectNames.join(", ");
 
+  // 按 project 追踪最近的 Cursor Agent sessionId，实现自动 session 复用
+  const lastSessionByProject = new Map<string, string>();
+
   return (ctx: ToolContext) => ({
     name: "cursor_agent",
     label: "Cursor Agent",
@@ -87,6 +90,10 @@ export function createCursorAgentTool(params: {
           enum: ["agent", "ask", "plan"],
           description: "Execution mode: ask (read-only analysis, default), plan (generate plan), agent (can modify files)",
         },
+        newSession: {
+          type: "boolean" as const,
+          description: "Force start a fresh session, discarding previous Cursor Agent context. Default false (auto-resumes last session for the project).",
+        },
       },
       required: ["project", "prompt"],
     },
@@ -99,6 +106,7 @@ export function createCursorAgentTool(params: {
       const project = String(args.project ?? "");
       const prompt = String(args.prompt ?? "");
       const mode = (args.mode as "agent" | "ask" | "plan") ?? "ask";
+      const forceNew = args.newSession === true;
 
       if (!project || !prompt) {
         return {
@@ -116,6 +124,12 @@ export function createCursorAgentTool(params: {
         };
       }
 
+      // 自动 session 追踪：默认复用上次同 project 的 session
+      let resumeSessionId: string | undefined;
+      if (!forceNew) {
+        resumeSessionId = lastSessionByProject.get(projectPath);
+      }
+
       const result = await runCursorAgent({
         agentPath: params.agentPath,
         resolvedBinary: params.resolvedBinary,
@@ -127,8 +141,14 @@ export function createCursorAgentTool(params: {
         enableMcp: params.cfg.enableMcp ?? true,
         model: params.cfg.model,
         prefixArgs: params.cfg.prefixArgs,
+        resumeSessionId,
         signal,
       });
+
+      // 更新 session 追踪
+      if (result.sessionId) {
+        lastSessionByProject.set(projectPath, result.sessionId);
+      }
 
       const messages = formatRunResult(result);
       const combined = messages.join("\n\n---\n\n");

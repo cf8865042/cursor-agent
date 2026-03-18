@@ -151,6 +151,7 @@ export interface ParsedCommand {
   project: string;
   prompt: string;
   mode: "agent" | "ask" | "plan";
+  model?: string;
   continueSession?: boolean;
   resumeSessionId?: string;
 }

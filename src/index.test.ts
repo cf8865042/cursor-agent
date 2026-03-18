@@ -66,6 +66,7 @@ describe("parseCommandArgs", () => {
       project: "myapp",
       prompt: "analyze code",
       mode: "agent",
+      model: undefined,
       continueSession: false,
       resumeSessionId: undefined,
     });
@@ -127,6 +128,27 @@ describe("parseCommandArgs", () => {
     expect((result as { error: string }).error).toContain("chatId");
   });
 
+  it("--model specifies model", () => {
+    const result = parseCommandArgs("myapp --model claude-4-sonnet analyze code");
+    expect(result).not.toHaveProperty("error");
+    expect((result as any).model).toBe("claude-4-sonnet");
+    expect((result as any).prompt).toBe("analyze code");
+  });
+
+  it("--model without value returns error", () => {
+    const result = parseCommandArgs("myapp --model");
+    expect(result).toHaveProperty("error");
+    expect((result as { error: string }).error).toContain("model");
+  });
+
+  it("--model combined with --mode", () => {
+    const result = parseCommandArgs("myapp --model gpt-4o --mode ask what is this");
+    expect(result).not.toHaveProperty("error");
+    expect((result as any).model).toBe("gpt-4o");
+    expect((result as any).mode).toBe("ask");
+    expect((result as any).prompt).toBe("what is this");
+  });
+
   it("combined --mode + --continue", () => {
     const result = parseCommandArgs("myapp --mode ask --continue tell me more");
     expect(result).not.toHaveProperty("error");
@@ -180,13 +202,14 @@ describe("resolveProjectPath", () => {
 // ──────────── plugin.register ────────────
 
 describe("plugin.register", () => {
-  let api: { registerCommand: ReturnType<typeof vi.fn>; registerTool: ReturnType<typeof vi.fn>; pluginConfig: any };
+  let api: { registerCommand: ReturnType<typeof vi.fn>; registerTool: ReturnType<typeof vi.fn>; registerService: ReturnType<typeof vi.fn>; pluginConfig: any };
 
   beforeEach(() => {
     vi.clearAllMocks();
     api = {
       registerCommand: vi.fn(),
       registerTool: vi.fn(),
+      registerService: vi.fn(),
       pluginConfig: {
         agentPath: "/usr/local/bin/agent",
         projects: { myapp: "/home/user/myapp" },

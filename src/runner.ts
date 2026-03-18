@@ -97,6 +97,7 @@ export async function runCursorAgent(opts: RunOptions): Promise<RunResult> {
   let usage: ResultEvent["usage"];
   let lastOutputTime = Date.now();
   const events: CollectedEvent[] = [];
+  const stderrChunks: string[] = [];
 
   const terminateProcess = () => {
     if (proc.exitCode !== null || proc.killed) return;
@@ -128,6 +129,12 @@ export async function runCursorAgent(opts: RunOptions): Promise<RunResult> {
   opts.signal?.addEventListener("abort", onAbort, { once: true });
 
   return new Promise<RunResult>((resolve) => {
+    if (proc.stderr) {
+      proc.stderr.on("data", (chunk: Buffer) => {
+        stderrChunks.push(chunk.toString());
+      });
+    }
+
     const rl = createInterface({ input: proc.stdout!, crlfDelay: Infinity });
 
     rl.on("line", (line) => {
@@ -211,10 +218,15 @@ export async function runCursorAgent(opts: RunOptions): Promise<RunResult> {
       }
 
       const durationMs = Date.now() - startTime;
+      const stderrText = stderrChunks.join("").trim();
+
+      if (!error && !completed && stderrText) {
+        error = stderrText;
+      }
 
       resolve({
         success: !error && completed,
-        resultText: resultText || (error ? `Cursor Agent execution failed: ${error}` : "No analysis result obtained"),
+        resultText: resultText || (stderrText ? stderrText : (error ? `Cursor Agent execution failed: ${error}` : "No analysis result obtained")),
         sessionId,
         durationMs,
         toolCallCount,

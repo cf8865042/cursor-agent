@@ -56,10 +56,11 @@ function detectAgentPath(): string | null {
  *   /cursor <project> --continue <prompt>
  *   /cursor <project> --resume <chatId> <prompt>
  *   /cursor <project> --mode ask|plan|agent <prompt>
+ *   /cursor <project> --model <model> <prompt>
  */
 export function parseCommandArgs(args: string): ParsedCommand | { error: string } {
   if (!args?.trim()) {
-    return { error: "Usage: /cursor <project> <prompt>\n\nOptions:\n  --continue          Continue previous session\n  --resume <chatId>   Resume a specific session\n  --mode <mode>       Set mode (agent|ask|plan)" };
+    return { error: "Usage: /cursor <project> <prompt>\n\nOptions:\n  --continue          Continue previous session\n  --resume <chatId>   Resume a specific session\n  --mode <mode>       Set mode (agent|ask|plan)\n  --model <model>     Specify model (e.g. claude-4-sonnet)" };
   }
 
   const tokens = tokenize(args.trim());
@@ -69,6 +70,7 @@ export function parseCommandArgs(args: string): ParsedCommand | { error: string 
 
   const project = tokens[0]!;
   let mode: "agent" | "ask" | "plan" = DEFAULT_MODE;
+  let model: string | undefined;
   let continueSession = false;
   let resumeSessionId: string | undefined;
   const promptParts: string[] = [];
@@ -93,6 +95,11 @@ export function parseCommandArgs(args: string): ParsedCommand | { error: string 
       }
       mode = m;
       i++;
+    } else if (token === "--model") {
+      i++;
+      if (i >= tokens.length) return { error: "--model requires a model name" };
+      model = tokens[i]!;
+      i++;
     } else {
       promptParts.push(tokens.slice(i).join(" "));
       break;
@@ -104,7 +111,7 @@ export function parseCommandArgs(args: string): ParsedCommand | { error: string 
     return { error: "Missing prompt parameter" };
   }
 
-  return { project, prompt, mode, continueSession, resumeSessionId };
+  return { project, prompt, mode, model, continueSession, resumeSessionId };
 }
 
 /** Simple tokenizer that preserves spaces within quotes */
@@ -207,7 +214,7 @@ export default {
           timeoutSec: cfg.defaultTimeoutSec ?? DEFAULT_TIMEOUT_SEC,
           noOutputTimeoutSec: cfg.noOutputTimeoutSec ?? DEFAULT_NO_OUTPUT_TIMEOUT_SEC,
           enableMcp: cfg.enableMcp ?? DEFAULT_ENABLE_MCP,
-          model: cfg.model,
+          model: parsed.model ?? cfg.model,
           prefixArgs: cfg.prefixArgs,
           continueSession: parsed.continueSession,
           resumeSessionId: parsed.resumeSessionId,

@@ -91,14 +91,3 @@ Skills directory: C:\Users\Administrator\.claude\skills
 <!-- SKILLS_TABLE_END -->
 
 </skills_system>
-
-<!-- OPENSPEC:START -->
-## OpenSpec
-
-This project uses [OpenSpec](openspec/) for specification-driven development.
-
-- Read `openspec/AGENTS.md` for the full workflow guide
-- Read `openspec/project.md` for project context
-- Active changes live in `openspec/changes/`
-- Specifications live in `openspec/specs/`
-<!-- OPENSPEC:END -->

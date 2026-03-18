@@ -19,7 +19,11 @@ export function formatRunResult(result: RunResult): string[] {
   if (fileSummary) sections.push(fileSummary);
 
   const conclusion = buildConclusion(result.events);
-  if (conclusion) sections.push(conclusion);
+  if (conclusion) {
+    sections.push(conclusion);
+  } else if (!result.success && result.resultText) {
+    sections.push(result.resultText);
+  }
 
   sections.push(buildFooter(result));
 

@@ -20,9 +20,13 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.2"
+  },
   "devDependencies": {
     "@types/node": "^25.3.2",
     "esbuild": "^0.24.0",
+    "openclaw": "^2026.3.8",
     "typescript": "^5.7.0",
     "vitest": "^4.0.18"
   }
