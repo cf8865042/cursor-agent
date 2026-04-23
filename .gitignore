@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+npm-cache/
+cdp-plugin/package-lock.json
 
 # Build output
 dist/

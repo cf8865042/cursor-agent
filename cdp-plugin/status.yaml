@@ -1,0 +1,23 @@
+site: cursor
+name: status
+description: "Check Cursor CDP connection status (requires --remote-debugging-port=9226)"
+strategy: public
+browser: false
+
+args:
+  port:
+    type: int
+    default: 9226
+    description: "Cursor CDP port"
+
+pipeline:
+  - fetch:
+      url: http://127.0.0.1:${{ args.port }}/json/version
+
+  - map:
+      status: CONNECTED
+      browser: ${{ item.Browser }}
+      electron: ${{ item['User-Agent'] }}
+      ws: ${{ item.webSocketDebuggerUrl }}
+
+columns: [status, browser, electron]

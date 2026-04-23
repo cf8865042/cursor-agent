@@ -1,0 +1,175 @@
+import { cli, Strategy } from "./_registry.js";
+import { CDP_PORT, connectTarget, evaluate, click, pressEscape, sleep } from "./cdp-utils.js";
+const projectCommand = cli({
+  site: "cursor",
+  name: "project",
+  description: "List available projects/workspaces in Agent window",
+  strategy: Strategy.PUBLIC,
+  browser: false,
+  args: [
+    { name: "port", type: "int", default: CDP_PORT, help: "Cursor CDP port" },
+    { name: "window", type: "int", default: 0, help: "Target window index" }
+  ],
+  columns: ["idx", "name", "current"],
+  func: async (_page, args) => {
+    const port = Number(args.port) || CDP_PORT;
+    const windowIdx = Number(args.window) || 0;
+    let ws, kind;
+    try {
+      ({ ws, kind } = await connectTarget(port, windowIdx));
+    } catch (e) {
+      return [{ idx: 0, name: e.message, current: "ERROR" }];
+    }
+    if (kind !== "agent") {
+      ws.close();
+      return [{ idx: 0, name: "This command only works in the Agent standalone window", current: "ERROR" }];
+    }
+    let msgId = 1;
+    try {
+      const currentProject = await evaluate(ws, `
+        (() => {
+          const trigger = document.querySelector('.ui-select-trigger');
+          return trigger ? trigger.textContent.trim() : '';
+        })()
+      `, msgId++);
+      const triggerPos = await evaluate(ws, `
+        (() => {
+          const btn = document.querySelector('.ui-select-trigger');
+          if (!btn) return null;
+          const r = btn.getBoundingClientRect();
+          return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        })()
+      `, msgId++);
+      if (!triggerPos) {
+        return [{ idx: 0, name: "Project picker not found (requires blank New Agent page)", current: "ERROR" }];
+      }
+      msgId = await click(ws, triggerPos.x, triggerPos.y, msgId);
+      await sleep(500);
+      const projects = await evaluate(ws, `
+        (() => {
+          const menu = document.querySelector('.project-selector-menu');
+          if (!menu) return [];
+          const rows = menu.querySelectorAll('.ui-menu__row');
+          const result = [];
+          let idx = 0;
+          rows.forEach(row => {
+            const text = row.textContent.trim();
+            if (!text || text === 'Open Folder' || text === 'Connect SSH') return;
+            idx++;
+            result.push({ idx, name: text });
+          });
+          return result;
+        })()
+      `, msgId++);
+      msgId = await pressEscape(ws, msgId);
+      return (projects || []).map((p) => ({
+        ...p,
+        current: p.name === currentProject ? "\u2713" : ""
+      }));
+    } finally {
+      ws.close();
+    }
+  }
+});
+const projectSwitchCommand = cli({
+  site: "cursor",
+  name: "project-switch",
+  description: "Switch project/workspace in Agent window (fuzzy match)",
+  strategy: Strategy.PUBLIC,
+  browser: false,
+  args: [
+    { name: "name", type: "str", required: true, positional: true, help: "Target project name (fuzzy match on path tail)" },
+    { name: "port", type: "int", default: CDP_PORT, help: "Cursor CDP port" },
+    { name: "window", type: "int", default: 0, help: "Target window index" }
+  ],
+  columns: ["status", "project"],
+  func: async (_page, args) => {
+    const port = Number(args.port) || CDP_PORT;
+    const windowIdx = Number(args.window) || 0;
+    const targetName = String(args.name).toLowerCase().trim();
+    let ws, kind;
+    try {
+      ({ ws, kind } = await connectTarget(port, windowIdx));
+    } catch (e) {
+      return [{ status: "ERROR", project: e.message }];
+    }
+    if (kind !== "agent") {
+      ws.close();
+      return [{ status: "ERROR", project: "This command only works in the Agent standalone window" }];
+    }
+    let msgId = 1;
+    try {
+      const triggerPos = await evaluate(ws, `
+        (() => {
+          const btn = document.querySelector('.ui-select-trigger');
+          if (!btn) return null;
+          const r = btn.getBoundingClientRect();
+          return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        })()
+      `, msgId++);
+      if (!triggerPos) {
+        return [{ status: "ERROR", project: "Project picker not found (requires blank New Agent page)" }];
+      }
+      msgId = await click(ws, triggerPos.x, triggerPos.y, msgId);
+      await sleep(500);
+      const matchResult = await evaluate(ws, `
+        (() => {
+          const target = ${JSON.stringify(targetName)};
+          const menu = document.querySelector('.project-selector-menu');
+          if (!menu) return { found: false, available: [] };
+          const rows = menu.querySelectorAll('.ui-menu__row');
+          let bestMatch = null;
+          let bestScore = 0;
+          const available = [];
+
+          rows.forEach(row => {
+            const text = row.textContent.trim();
+            if (!text || text === 'Open Folder' || text === 'Connect SSH') return;
+            available.push(text);
+            const lower = text.toLowerCase();
+            const parts = text.replace(/\\\\/g, '/').split('/');
+            const lastName = parts[parts.length - 1].toLowerCase();
+
+            if (lower === target) { bestMatch = row; bestScore = 100; return; }
+            if (lastName === target) { bestMatch = row; bestScore = 90; return; }
+            if (lower.includes(target)) {
+              const score = 50;
+              if (score > bestScore) { bestMatch = row; bestScore = score; }
+              return;
+            }
+            if (lastName.includes(target)) {
+              const score = 40;
+              if (score > bestScore) { bestMatch = row; bestScore = score; }
+            }
+          });
+
+          if (bestMatch && bestScore > 0) {
+            const r = bestMatch.getBoundingClientRect();
+            return { found: true, name: bestMatch.textContent.trim(), x: r.x + r.width/2, y: r.y + r.height/2 };
+          }
+          return { found: false, available };
+        })()
+      `, msgId++);
+      if (!matchResult.found) {
+        msgId = await pressEscape(ws, msgId);
+        const avail = matchResult.available?.join(", ") || "";
+        return [{ status: "NOT FOUND", project: `"${targetName}" not matched. Available: ${avail}` }];
+      }
+      msgId = await click(ws, matchResult.x, matchResult.y, msgId);
+      await sleep(500);
+      const newProject = await evaluate(ws, `
+        (() => {
+          const trigger = document.querySelector('.ui-select-trigger');
+          return trigger ? trigger.textContent.trim() : '';
+        })()
+      `, msgId++);
+      return [{ status: "OK", project: newProject || matchResult.name || "" }];
+    } finally {
+      ws.close();
+    }
+  }
+});
+export {
+  projectCommand,
+  projectSwitchCommand
+};
