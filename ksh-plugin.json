@@ -4,7 +4,7 @@
   "plugins": {
     "cursor-cdp": {
       "path": "cdp-plugin",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "description": "Control Cursor IDE via Chrome DevTools Protocol (CDP) — send prompts, read chat, switch models, browse history, take screenshots, manage projects"
     }
   }

@@ -1,9 +1,13 @@
 {
   "name": "cursor-cdp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "dependencies": {
+  "scripts": {
+    "build": "esbuild cdp-utils.ts --bundle --platform=node --format=esm --outfile=cdp-utils.js --external:bufferutil --external:utf-8-validate --banner:js='import{createRequire as __cr}from\"module\";var require=__cr(import.meta.url);' && esbuild _registry.ts list.ts send.ts read.ts history.ts model.ts screenshot.ts new-chat.ts project.ts --platform=node --format=esm --outdir=."
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0",
     "ws": "^8.18.0"
   }
 }
