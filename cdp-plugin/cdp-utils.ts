@@ -90,6 +90,60 @@ export async function pressEscape(ws: WebSocket, id: number): Promise<number> {
   return id + 2;
 }
 
+/**
+ * CDP 页面标题格式为 "filename - projectName - Cursor [user]"。
+ * 先去掉 " - Cursor [...]" 后缀，再取最后一段作为项目名。
+ */
+function extractProjectFromTitle(title: string): string {
+  const stripped = title.replace(/ - Cursor \[.*\]$/, "");
+  const sep = stripped.lastIndexOf(" - ");
+  return sep > 0 ? stripped.substring(sep + 3).trim() : stripped;
+}
+
+/**
+ * 按项目名模糊匹配窗口。优先级：精确匹配 > 包含匹配。
+ * 同时考虑 Agent 窗口（无法从标题判断项目，会排在最后）。
+ */
+export async function connectTargetByProject(
+  port: number,
+  projectName: string,
+): Promise<{ ws: WebSocket; kind: WindowKind; matchedTitle: string }> {
+  const pages = await listPages(port);
+  if (pages.length === 0) throw new Error("No Cursor windows found");
+
+  const target = projectName.toLowerCase();
+  let bestPage: PageTarget | null = null;
+  let bestScore = 0;
+
+  for (const page of pages) {
+    const project = extractProjectFromTitle(page.title).toLowerCase();
+    let score = 0;
+    if (project === target) {
+      score = 100;
+    } else if (project.includes(target)) {
+      score = 60;
+    } else if (target.includes(project)) {
+      score = 40;
+    }
+    if (score > bestScore) {
+      bestPage = page;
+      bestScore = score;
+    }
+  }
+
+  if (!bestPage) {
+    const available = pages.map((p) => extractProjectFromTitle(p.title)).join(", ");
+    throw new Error(`No window matching project "${projectName}". Available: ${available}`);
+  }
+
+  const ws = new WebSocket(bestPage.webSocketDebuggerUrl);
+  await new Promise<void>((resolve, reject) => {
+    ws.on("open", resolve);
+    ws.on("error", reject);
+  });
+  return { ws, kind: detectWindowKind(bestPage.title), matchedTitle: bestPage.title };
+}
+
 export function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }

@@ -85,7 +85,7 @@ Output: `status`, `project`
 Send a prompt and wait for AI reply. Auto-adapts input box and send button per window type.
 
 ```bash
-opencli cursor send <prompt> [--port 9226] [--window 0] [--timeout 60]
+opencli cursor send <prompt> [--port 9226] [--window 0] [--timeout 60] [--project ""]
 ```
 
 | Param | Type | Default | Description |
@@ -93,6 +93,7 @@ opencli cursor send <prompt> [--port 9226] [--window 0] [--timeout 60]
 | `prompt` | str | (required) | Prompt content (positional) |
 | `--timeout` | int | 60 | Wait timeout in seconds |
 | `--window` | int | 0 | Target window index |
+| `--project` | str | "" | Target project name (fuzzy match on window title). Auto-finds the correct window in Editor mode; verifies project in Agent mode |
 
 Selectors:
 - **Agent**: input `.ui-prompt-input-editor__input`, send `.ui-prompt-input-submit-button`

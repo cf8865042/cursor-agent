@@ -84,7 +84,10 @@ opencli cursor list
 # Open a new Agent tab
 opencli cursor new-chat
 
-# Switch to llm-wiki project
+# Send to a specific project (auto-finds window by project name, works in both Agent & Editor)
+opencli cursor send "analyze this code" --project "mcd"
+
+# Switch project in Agent window (Agent only)
 opencli cursor project-switch "llm-wiki"
 
 # Send a prompt (auto-selects Agent window)

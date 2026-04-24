@@ -176,15 +176,48 @@ export const projectSwitchCommand = cli({
         return [{ status: "NOT FOUND", project: `"${targetName}" not matched. Available: ${avail}` }];
       }
 
-      msgId = await click(ws, matchResult.x!, matchResult.y!, msgId);
-      await sleep(500);
-
-      const newProject = (await evaluate(ws, `
+      const beforeProject = (await evaluate(ws, `
         (() => {
           const trigger = document.querySelector('.ui-select-trigger');
           return trigger ? trigger.textContent.trim() : '';
         })()
       `, msgId++)) as string;
+
+      msgId = await click(ws, matchResult.x!, matchResult.y!, msgId);
+
+      const SWITCH_TIMEOUT_MS = 8000;
+      const SWITCH_POLL_MS = 500;
+      const switchStart = Date.now();
+      let newProject = "";
+      let switchReady = false;
+
+      while (Date.now() - switchStart < SWITCH_TIMEOUT_MS) {
+        await sleep(SWITCH_POLL_MS);
+
+        const switchState = (await evaluate(ws, `
+          (() => {
+            const trigger = document.querySelector('.ui-select-trigger');
+            const triggerText = trigger ? trigger.textContent.trim() : '';
+            const input = document.querySelector('.ui-prompt-input-editor__input');
+            const inputReady = !!input && input.getBoundingClientRect().height > 0;
+            const menu = document.querySelector('.project-selector-menu');
+            const menuDismissed = !menu || menu.getBoundingClientRect().height === 0;
+            return { triggerText, inputReady, menuDismissed };
+          })()
+        `, msgId++)) as { triggerText: string; inputReady: boolean; menuDismissed: boolean };
+
+        newProject = switchState.triggerText;
+        const triggerChanged = newProject !== beforeProject;
+
+        if (triggerChanged && switchState.inputReady && switchState.menuDismissed) {
+          switchReady = true;
+          break;
+        }
+      }
+
+      if (!switchReady) {
+        return [{ status: "TIMEOUT", project: `Switch may not have completed. Current: "${newProject}", Expected: "${matchResult.name}"` }];
+      }
 
       return [{ status: "OK", project: newProject || matchResult.name || "" }];
     } finally {

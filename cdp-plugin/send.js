@@ -1,5 +1,5 @@
 import { cli, Strategy } from "./_registry.js";
-import { CDP_PORT, connectTarget, cdpCall, evaluate, click, sleep } from "./cdp-utils.js";
+import { CDP_PORT, connectTarget, connectTargetByProject, cdpCall, evaluate, click, sleep } from "./cdp-utils.js";
 const POLL_INTERVAL_MS = 3e3;
 function selectors(kind) {
   if (kind === "agent") {
@@ -29,7 +29,8 @@ const sendCommand = cli({
     { name: "prompt", type: "str", required: true, positional: true, help: "Prompt text to send" },
     { name: "port", type: "int", default: CDP_PORT, help: "Cursor CDP port" },
     { name: "window", type: "int", default: 0, help: "Target window index (0=auto)" },
-    { name: "timeout", type: "int", default: 60, help: "Timeout seconds for AI reply" }
+    { name: "timeout", type: "int", default: 60, help: "Timeout seconds for AI reply" },
+    { name: "project", type: "str", default: "", help: "Expected project name (fuzzy). If set, verify before sending" }
   ],
   columns: ["role", "content"],
   func: async (_page, args) => {
@@ -37,15 +38,37 @@ const sendCommand = cli({
     const port = Number(args.port) || CDP_PORT;
     const windowIdx = Number(args.window) || 0;
     const timeoutMs = (Number(args.timeout) || 60) * 1e3;
+    const expectedProject = String(args.project || "").trim();
     let ws, kind;
     try {
-      ({ ws, kind } = await connectTarget(port, windowIdx));
+      if (expectedProject && windowIdx === 0) {
+        ({ ws, kind } = await connectTargetByProject(port, expectedProject));
+      } else {
+        ({ ws, kind } = await connectTarget(port, windowIdx));
+      }
     } catch (e) {
       return [{ role: "error", content: e.message }];
     }
     const sel = selectors(kind);
     let msgId = 1;
     try {
+      if (expectedProject && kind === "agent") {
+        const currentProject = await evaluate(ws, `
+          (() => {
+            const trigger = document.querySelector('.ui-select-trigger');
+            return trigger ? trigger.textContent.trim() : '';
+          })()
+        `, msgId++);
+        const current = currentProject.toLowerCase();
+        const expected = expectedProject.toLowerCase();
+        if (!current.includes(expected) && !expected.includes(current)) {
+          const parts = currentProject.replace(/\\/g, "/").split("/");
+          const lastName = parts[parts.length - 1].toLowerCase();
+          if (lastName !== expected && !lastName.includes(expected)) {
+            return [{ role: "error", content: `Project mismatch: current="${currentProject}", expected contains "${expectedProject}". Run project-switch first.` }];
+          }
+        }
+      }
       const beforeCount = await evaluate(ws, `
         document.querySelectorAll('${sel.userMsgs}').length
       `, msgId++);

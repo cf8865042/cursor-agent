@@ -3719,6 +3719,43 @@ async function pressEscape(ws, id) {
   await cdpCall(ws, "Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 }, id + 1);
   return id + 2;
 }
+function extractProjectFromTitle(title) {
+  const stripped = title.replace(/ - Cursor \[.*\]$/, "");
+  const sep = stripped.lastIndexOf(" - ");
+  return sep > 0 ? stripped.substring(sep + 3).trim() : stripped;
+}
+async function connectTargetByProject(port, projectName) {
+  const pages = await listPages(port);
+  if (pages.length === 0) throw new Error("No Cursor windows found");
+  const target = projectName.toLowerCase();
+  let bestPage = null;
+  let bestScore = 0;
+  for (const page of pages) {
+    const project = extractProjectFromTitle(page.title).toLowerCase();
+    let score = 0;
+    if (project === target) {
+      score = 100;
+    } else if (project.includes(target)) {
+      score = 60;
+    } else if (target.includes(project)) {
+      score = 40;
+    }
+    if (score > bestScore) {
+      bestPage = page;
+      bestScore = score;
+    }
+  }
+  if (!bestPage) {
+    const available = pages.map((p) => extractProjectFromTitle(p.title)).join(", ");
+    throw new Error(`No window matching project "${projectName}". Available: ${available}`);
+  }
+  const ws = new wrapper_default(bestPage.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => {
+    ws.on("open", resolve);
+    ws.on("error", reject);
+  });
+  return { ws, kind: detectWindowKind(bestPage.title), matchedTitle: bestPage.title };
+}
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -3727,6 +3764,7 @@ export {
   cdpCall,
   click,
   connectTarget,
+  connectTargetByProject,
   detectWindowKind,
   dispatchMouse,
   evaluate,
