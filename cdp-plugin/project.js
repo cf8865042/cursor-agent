@@ -1,5 +1,5 @@
 import { cli, Strategy } from "./_registry.js";
-import { CDP_PORT, connectTarget, evaluate, click, pressEscape, sleep } from "./cdp-utils.js";
+import { CDP_PORT, CDP_HOST, connectTarget, evaluate, click, pressEscape, sleep } from "./cdp-utils.js";
 const projectCommand = cli({
   site: "cursor",
   name: "project",
@@ -8,15 +8,17 @@ const projectCommand = cli({
   browser: false,
   args: [
     { name: "port", type: "int", default: CDP_PORT, help: "Cursor CDP port" },
+    { name: "host", type: "str", default: CDP_HOST, help: "Cursor CDP host (IP or hostname)" },
     { name: "window", type: "int", default: 0, help: "Target window index" }
   ],
   columns: ["idx", "name", "current"],
   func: async (_page, args) => {
     const port = Number(args.port) || CDP_PORT;
+    const host = String(args.host || CDP_HOST);
     const windowIdx = Number(args.window) || 0;
     let ws, kind;
     try {
-      ({ ws, kind } = await connectTarget(port, windowIdx));
+      ({ ws, kind } = await connectTarget(port, windowIdx, host));
     } catch (e) {
       return [{ idx: 0, name: e.message, current: "ERROR" }];
     }
@@ -80,16 +82,18 @@ const projectSwitchCommand = cli({
   args: [
     { name: "name", type: "str", required: true, positional: true, help: "Target project name (fuzzy match on path tail)" },
     { name: "port", type: "int", default: CDP_PORT, help: "Cursor CDP port" },
+    { name: "host", type: "str", default: CDP_HOST, help: "Cursor CDP host (IP or hostname)" },
     { name: "window", type: "int", default: 0, help: "Target window index" }
   ],
   columns: ["status", "project"],
   func: async (_page, args) => {
     const port = Number(args.port) || CDP_PORT;
+    const host = String(args.host || CDP_HOST);
     const windowIdx = Number(args.window) || 0;
     const targetName = String(args.name).toLowerCase().trim();
     let ws, kind;
     try {
-      ({ ws, kind } = await connectTarget(port, windowIdx));
+      ({ ws, kind } = await connectTarget(port, windowIdx, host));
     } catch (e) {
       return [{ status: "ERROR", project: e.message }];
     }

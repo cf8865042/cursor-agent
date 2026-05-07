@@ -1,6 +1,7 @@
 import WebSocket from "ws";
 
 export const CDP_PORT = 9226;
+export const CDP_HOST = "127.0.0.1";
 
 export interface CDPResponse {
   id: number;
@@ -21,19 +22,39 @@ export function detectWindowKind(title: string): WindowKind {
   return title === "Cursor Agents" ? "agent" : "editor";
 }
 
-export async function listPages(port: number): Promise<PageTarget[]> {
-  const resp = await fetch(`http://127.0.0.1:${port}/json/list`);
+/**
+ * Rewrite WebSocket URL to use the specified host instead of localhost/127.0.0.1.
+ * CDP returns URLs like ws://127.0.0.1:9226/devtools/page/xxx which need to be
+ * rewritten when connecting to a remote CDP endpoint.
+ */
+function rewriteWebSocketUrl(wsUrl: string, targetHost: string): string {
+  try {
+    const url = new URL(wsUrl);
+    url.hostname = targetHost;
+    return url.toString();
+  } catch {
+    return wsUrl.replace(/^(wss?:\/\/)(127\.0\.0\.1|localhost)(:\d+)/, `$1${targetHost}$3`);
+  }
+}
+
+export async function listPages(port: number, host: string = CDP_HOST): Promise<PageTarget[]> {
+  const resp = await fetch(`http://${host}:${port}/json/list`);
   if (!resp.ok) throw new Error("CDP not connected. Launch Cursor with --remote-debugging-port");
   const targets = (await resp.json()) as PageTarget[];
-  return targets.filter((t) => t.type === "page");
+  return targets
+    .filter((t) => t.type === "page")
+    .map((t) => ({
+      ...t,
+      webSocketDebuggerUrl: rewriteWebSocketUrl(t.webSocketDebuggerUrl, host),
+    }));
 }
 
 /**
  * windowIdx is 1-based (matching `list` command output).
  * Pass 0 or omit to auto-select: prefers Agent window, falls back to first Editor.
  */
-export async function connectTarget(port: number, windowIdx = 0): Promise<{ ws: WebSocket; kind: WindowKind }> {
-  const pages = await listPages(port);
+export async function connectTarget(port: number, windowIdx = 0, host: string = CDP_HOST): Promise<{ ws: WebSocket; kind: WindowKind }> {
+  const pages = await listPages(port, host);
   if (pages.length === 0) throw new Error("No Cursor windows found");
 
   let target: PageTarget;
@@ -107,8 +128,9 @@ function extractProjectFromTitle(title: string): string {
 export async function connectTargetByProject(
   port: number,
   projectName: string,
+  host: string = CDP_HOST,
 ): Promise<{ ws: WebSocket; kind: WindowKind; matchedTitle: string }> {
-  const pages = await listPages(port);
+  const pages = await listPages(port, host);
   if (pages.length === 0) throw new Error("No Cursor windows found");
 
   const target = projectName.toLowerCase();

@@ -1,5 +1,5 @@
 import { cli, Strategy } from "./_registry.js";
-import { CDP_PORT, connectTarget, evaluate, click, pressEscape, sleep } from "./cdp-utils.js";
+import { CDP_PORT, CDP_HOST, connectTarget, evaluate, click, pressEscape, sleep } from "./cdp-utils.js";
 
 export const modelCommand = cli({
   site: "cursor",
@@ -9,17 +9,19 @@ export const modelCommand = cli({
   browser: false,
   args: [
     { name: "port", type: "int", default: CDP_PORT, help: "Cursor CDP port" },
+    { name: "host", type: "str", default: CDP_HOST, help: "Cursor CDP host (IP or hostname)" },
     { name: "window", type: "int", default: 0, help: "Target window index" },
   ],
   columns: ["idx", "name", "tier", "current"],
 
   func: async (_page: unknown, args: Record<string, unknown>) => {
     const port = Number(args.port) || CDP_PORT;
+    const host = String(args.host || CDP_HOST);
     const windowIdx = Number(args.window) || 0;
 
     let ws: import("ws").default;
     try {
-      ({ ws } = await connectTarget(port, windowIdx));
+      ({ ws } = await connectTarget(port, windowIdx, host));
     } catch (e: unknown) {
       return [{ idx: 0, name: "ERROR", tier: "", current: (e as Error).message }];
     }
@@ -92,18 +94,20 @@ export const modelSwitchCommand = cli({
   args: [
     { name: "name", type: "str", required: true, positional: true, help: "Target model name (fuzzy match)" },
     { name: "port", type: "int", default: CDP_PORT, help: "Cursor CDP port" },
+    { name: "host", type: "str", default: CDP_HOST, help: "Cursor CDP host (IP or hostname)" },
     { name: "window", type: "int", default: 0, help: "Target window index" },
   ],
   columns: ["status", "model"],
 
   func: async (_page: unknown, args: Record<string, unknown>) => {
     const port = Number(args.port) || CDP_PORT;
+    const host = String(args.host || CDP_HOST);
     const windowIdx = Number(args.window) || 0;
     const targetName = String(args.name).toLowerCase().trim();
 
     let ws: import("ws").default;
     try {
-      ({ ws } = await connectTarget(port, windowIdx));
+      ({ ws } = await connectTarget(port, windowIdx, host));
     } catch (e: unknown) {
       return [{ status: "ERROR", model: (e as Error).message }];
     }

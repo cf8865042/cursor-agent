@@ -2236,7 +2236,7 @@ var require_websocket = __commonJS({
     var tls = __require("tls");
     var { randomBytes, createHash } = __require("crypto");
     var { Duplex, Readable } = __require("stream");
-    var { URL } = __require("url");
+    var { URL: URL2 } = __require("url");
     var PerMessageDeflate2 = require_permessage_deflate();
     var Receiver2 = require_receiver();
     var Sender2 = require_sender();
@@ -2729,11 +2729,11 @@ var require_websocket = __commonJS({
         );
       }
       let parsedUrl;
-      if (address instanceof URL) {
+      if (address instanceof URL2) {
         parsedUrl = address;
       } else {
         try {
-          parsedUrl = new URL(address);
+          parsedUrl = new URL2(address);
         } catch {
           throw new SyntaxError(`Invalid URL: ${address}`);
         }
@@ -2870,7 +2870,7 @@ var require_websocket = __commonJS({
           req.abort();
           let addr;
           try {
-            addr = new URL(location, address);
+            addr = new URL2(location, address);
           } catch (e) {
             const err = new SyntaxError(`Invalid URL: ${location}`);
             emitErrorAndClose(websocket, err);
@@ -3660,17 +3660,30 @@ var wrapper_default = import_websocket.default;
 
 // cdp-utils.ts
 var CDP_PORT = 9226;
+var CDP_HOST = "127.0.0.1";
 function detectWindowKind(title) {
   return title === "Cursor Agents" ? "agent" : "editor";
 }
-async function listPages(port) {
-  const resp = await fetch(`http://127.0.0.1:${port}/json/list`);
+function rewriteWebSocketUrl(wsUrl, targetHost) {
+  try {
+    const url = new URL(wsUrl);
+    url.hostname = targetHost;
+    return url.toString();
+  } catch {
+    return wsUrl.replace(/^(wss?:\/\/)(127\.0\.0\.1|localhost)(:\d+)/, `$1${targetHost}$3`);
+  }
+}
+async function listPages(port, host = CDP_HOST) {
+  const resp = await fetch(`http://${host}:${port}/json/list`);
   if (!resp.ok) throw new Error("CDP not connected. Launch Cursor with --remote-debugging-port");
   const targets = await resp.json();
-  return targets.filter((t) => t.type === "page");
+  return targets.filter((t) => t.type === "page").map((t) => ({
+    ...t,
+    webSocketDebuggerUrl: rewriteWebSocketUrl(t.webSocketDebuggerUrl, host)
+  }));
 }
-async function connectTarget(port, windowIdx = 0) {
-  const pages = await listPages(port);
+async function connectTarget(port, windowIdx = 0, host = CDP_HOST) {
+  const pages = await listPages(port, host);
   if (pages.length === 0) throw new Error("No Cursor windows found");
   let target;
   if (windowIdx > 0) {
@@ -3724,8 +3737,8 @@ function extractProjectFromTitle(title) {
   const sep = stripped.lastIndexOf(" - ");
   return sep > 0 ? stripped.substring(sep + 3).trim() : stripped;
 }
-async function connectTargetByProject(port, projectName) {
-  const pages = await listPages(port);
+async function connectTargetByProject(port, projectName, host = CDP_HOST) {
+  const pages = await listPages(port, host);
   if (pages.length === 0) throw new Error("No Cursor windows found");
   const target = projectName.toLowerCase();
   let bestPage = null;
@@ -3760,6 +3773,7 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 export {
+  CDP_HOST,
   CDP_PORT,
   cdpCall,
   click,

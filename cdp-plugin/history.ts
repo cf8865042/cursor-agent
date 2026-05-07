@@ -1,5 +1,5 @@
 import { cli, Strategy } from "./_registry.js";
-import { CDP_PORT, connectTarget, evaluate, click, pressEscape, sleep, type WindowKind } from "./cdp-utils.js";
+import { CDP_PORT, CDP_HOST, connectTarget, evaluate, click, pressEscape, sleep, type WindowKind } from "./cdp-utils.js";
 
 async function readAgentHistory(ws: import("ws").default, keyword: string) {
   const hasKeyword = keyword && keyword !== "undefined";
@@ -106,18 +106,20 @@ export const historyCommand = cli({
   args: [
     { name: "keyword", type: "str", positional: true, help: "Search keyword" },
     { name: "port", type: "int", default: CDP_PORT, help: "Cursor CDP port" },
+    { name: "host", type: "str", default: CDP_HOST, help: "Cursor CDP host (IP or hostname)" },
     { name: "window", type: "int", default: 0, help: "Target window index (0=auto)" },
   ],
   columns: ["idx", "group", "name"],
 
   func: async (_page: unknown, args: Record<string, unknown>) => {
     const port = Number(args.port) || CDP_PORT;
+    const host = String(args.host || CDP_HOST);
     const windowIdx = Number(args.window) || 0;
     const keyword = String(args.keyword || "").trim();
 
     let ws: import("ws").default, kind: WindowKind;
     try {
-      ({ ws, kind } = await connectTarget(port, windowIdx));
+      ({ ws, kind } = await connectTarget(port, windowIdx, host));
     } catch (e: unknown) {
       return [{ idx: 0, group: "ERROR", name: (e as Error).message }];
     }
