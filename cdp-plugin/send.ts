@@ -1,5 +1,5 @@
 import { cli, Strategy } from "./_registry.js";
-import { CDP_PORT, connectTarget, connectTargetByProject, cdpCall, evaluate, click, sleep, type WindowKind } from "./cdp-utils.js";
+import { CDP_PORT, CDP_HOST, connectTarget, connectTargetByProject, cdpCall, evaluate, click, sleep, type WindowKind } from "./cdp-utils.js";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -31,6 +31,7 @@ export const sendCommand = cli({
   args: [
     { name: "prompt", type: "str", required: true, positional: true, help: "Prompt text to send" },
     { name: "port", type: "int", default: CDP_PORT, help: "Cursor CDP port" },
+    { name: "host", type: "str", default: CDP_HOST, help: "Cursor CDP host (IP or hostname)" },
     { name: "window", type: "int", default: 0, help: "Target window index (0=auto)" },
     { name: "timeout", type: "int", default: 60, help: "Timeout seconds for AI reply" },
     { name: "project", type: "str", default: "", help: "Expected project name (fuzzy). If set, verify before sending" },
@@ -40,6 +41,7 @@ export const sendCommand = cli({
   func: async (_page: unknown, args: Record<string, unknown>) => {
     const prompt = String(args.prompt);
     const port = Number(args.port) || CDP_PORT;
+    const host = String(args.host || CDP_HOST);
     const windowIdx = Number(args.window) || 0;
     const timeoutMs = (Number(args.timeout) || 60) * 1000;
     const expectedProject = String(args.project || "").trim();
@@ -47,9 +49,9 @@ export const sendCommand = cli({
     let ws, kind: WindowKind;
     try {
       if (expectedProject && windowIdx === 0) {
-        ({ ws, kind } = await connectTargetByProject(port, expectedProject));
+        ({ ws, kind } = await connectTargetByProject(port, expectedProject, host));
       } else {
-        ({ ws, kind } = await connectTarget(port, windowIdx));
+        ({ ws, kind } = await connectTarget(port, windowIdx, host));
       }
     } catch (e: unknown) {
       return [{ role: "error", content: (e as Error).message }];

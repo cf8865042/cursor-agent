@@ -1,6 +1,5 @@
 import { cli, Strategy } from "./_registry.js";
-
-const CDP_PORT = 9226;
+import { CDP_PORT, CDP_HOST, listPages } from "./cdp-utils.js";
 
 export const listCommand = cli({
   site: "cursor",
@@ -10,15 +9,21 @@ export const listCommand = cli({
   browser: false,
   args: [
     { name: "port", type: "int", default: CDP_PORT, help: "Cursor CDP port" },
+    { name: "host", type: "str", default: CDP_HOST, help: "Cursor CDP host (IP or hostname)" },
   ],
   columns: ["idx", "type", "title", "id"],
 
   func: async (_page: unknown, args: Record<string, unknown>) => {
     const port = Number(args.port) || CDP_PORT;
-    const resp = await fetch(`http://127.0.0.1:${port}/json/list`);
-    if (!resp.ok) return [{ idx: 0, type: "ERROR", title: "CDP not connected", id: "" }];
-    const targets = (await resp.json()) as Array<{ id: string; title: string; type: string }>;
-    const pages = targets.filter((t) => t.type === "page");
+    const host = String(args.host || CDP_HOST);
+
+    let pages;
+    try {
+      pages = await listPages(port, host);
+    } catch {
+      return [{ idx: 0, type: "ERROR", title: "CDP not connected", id: "" }];
+    }
+
     if (pages.length === 0) return [{ idx: 0, type: "ERROR", title: "No windows found", id: "" }];
 
     return pages.map((p, i) => ({

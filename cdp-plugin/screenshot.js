@@ -1,7 +1,7 @@
 import { cli, Strategy } from "./_registry.js";
 import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { CDP_PORT, connectTarget, cdpCall, evaluate } from "./cdp-utils.js";
+import { CDP_PORT, CDP_HOST, connectTarget, cdpCall, evaluate } from "./cdp-utils.js";
 function getOutputPath(dir, prefix, format) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   const ts = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").substring(0, 19);
@@ -22,18 +22,20 @@ const screenshotCommand = cli({
     { name: "img-format", type: "str", default: "png", help: "Image format: png, jpeg, webp" },
     { name: "quality", type: "int", default: 90, help: "JPEG/WebP quality (0-100)" },
     { name: "port", type: "int", default: CDP_PORT, help: "Cursor CDP port" },
+    { name: "host", type: "str", default: CDP_HOST, help: "Cursor CDP host (IP or hostname)" },
     { name: "window", type: "int", default: 0, help: "Target window index" }
   ],
   columns: ["status", "file", "size"],
   func: async (_page, args) => {
     const port = Number(args.port) || CDP_PORT;
+    const host = String(args.host || CDP_HOST);
     const windowIdx = Number(args.window) || 0;
     const area = String(args.area || "chat").trim();
     const format = String(args["img-format"] || "png");
     const quality = Number(args.quality) || 90;
     let ws, kind;
     try {
-      ({ ws, kind } = await connectTarget(port, windowIdx));
+      ({ ws, kind } = await connectTarget(port, windowIdx, host));
     } catch (e) {
       return [{ status: "ERROR", file: e.message, size: "" }];
     }
