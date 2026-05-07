@@ -1,8 +1,8 @@
 {
   "name": "cursor-cdp",
-  "version": "0.1.0",
-  "description": "Control Cursor IDE via CDP — send prompts, read chat, switch models, browse history, take screenshots, manage projects",
+  "version": "0.2.0",
+  "description": "Control Cursor IDE via CDP — send prompts, read chat, switch models, browse history, take screenshots, manage projects. Supports remote CDP endpoints via --host parameter.",
   "author": "toheart",
-  "tags": ["cursor", "ide", "electron", "cdp", "ai-agent"],
+  "tags": ["cursor", "ide", "electron", "cdp", "ai-agent", "remote"],
   "commands": ["status", "list", "send", "read", "history", "model", "model-switch", "screenshot", "new-chat", "project", "project-switch"]
 }
